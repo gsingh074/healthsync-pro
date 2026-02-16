@@ -193,13 +193,6 @@ export default function App() {
 
   const stats = calculateStats();
 
-  // Helper function to get the actual column name for a vital
-  const getColumnName = (data, possibleNames) => {
-    if (!data || data.length === 0) return null;
-    const firstRow = data[0];
-    return possibleNames.find(name => firstRow.hasOwnProperty(name)) || null;
-  };
-
   if (!isLoggedIn) {
     return (
       <div style={{
