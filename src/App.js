@@ -32,7 +32,6 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeView, setActiveView] = useState("dashboard");
   const [persons, setPersons] = useState([]);
-  const [selectedPerson, setSelectedPerson] = useState(null);
   const [uploadedData, setUploadedData] = useState([]);
   const [analysis, setAnalysis] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -787,7 +786,6 @@ export default function App() {
                           onMouseLeave={(e) =>
                             (e.currentTarget.style.background = "#f8fafc")
                           }
-                          onClick={() => setSelectedPerson(person)}
                         >
                           <td
                             style={{
