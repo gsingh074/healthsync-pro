@@ -985,6 +985,24 @@ export default function App() {
             ) : (
               <div style={{ display: 'grid', gap: '24px' }}>
                 
+                {/* Debug Info - Show Available Columns */}
+                <div style={{
+                  background: '#fef3c7',
+                  border: '1px solid #fbbf24',
+                  borderRadius: '12px',
+                  padding: '16px'
+                }}>
+                  <p style={{ fontWeight: '600', color: '#92400e', margin: '0 0 8px 0' }}>
+                    📊 Available Data Columns:
+                  </p>
+                  <p style={{ fontSize: '13px', color: '#78350f', margin: 0, fontFamily: 'monospace' }}>
+                    {selectedPerson.healthData[0] ? Object.keys(selectedPerson.healthData[0]).join(', ') : 'No data'}
+                  </p>
+                  <p style={{ fontSize: '12px', color: '#92400e', margin: '8px 0 0 0' }}>
+                    💡 Charts will show for columns containing: HR/heart, BP/blood, SPO2/oxygen
+                  </p>
+                </div>
+                
                 {/* Data Table */}
                 <div style={{
                   background: 'white',
@@ -1034,97 +1052,130 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Charts */}
+                {/* Charts - Improved Detection */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
-                  {/* Heart Rate Chart */}
-                  {selectedPerson.healthData.some(d => d.HR || d.hr || d['Heart Rate'] || d.HeartRate) && (() => {
-                    const hrColumn = getColumnName(selectedPerson.healthData, ['HR', 'hr', 'Heart Rate', 'HeartRate']);
-                    return hrColumn && (
-                    <div style={{
-                      background: 'white',
-                      borderRadius: '16px',
-                      padding: '28px',
-                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.06)',
-                      border: '1px solid #e2e8f0'
-                    }}>
-                      <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Heart size={20} color="#ff6b6b" />
-                        Heart Rate Trends
-                      </h3>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <AreaChart data={selectedPerson.healthData.slice(0, 30)}>
-                          <defs>
-                            <linearGradient id="colorHR" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#ff6b6b" stopOpacity={0.3}/>
-                              <stop offset="95%" stopColor="#ff6b6b" stopOpacity={0}/>
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                          <XAxis dataKey="id" stroke="#94a3b8" fontSize={12} />
-                          <YAxis stroke="#94a3b8" fontSize={12} />
-                          <Tooltip contentStyle={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
-                          <Area type="monotone" dataKey={hrColumn} stroke="#ff6b6b" strokeWidth={3} fillOpacity={1} fill="url(#colorHR)" />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  );})()}
+                  {/* Heart Rate Chart - Search for any HR-related column */}
+                  {(() => {
+                    const columns = Object.keys(selectedPerson.healthData[0] || {});
+                    const hrColumn = columns.find(col => 
+                      col.toLowerCase().includes('hr') || 
+                      col.toLowerCase().includes('heart') ||
+                      col.toLowerCase().includes('pulse')
+                    );
+                    
+                    if (!hrColumn) return null;
+                    
+                    return (
+                      <div style={{
+                        background: 'white',
+                        borderRadius: '16px',
+                        padding: '28px',
+                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.06)',
+                        border: '1px solid #e2e8f0'
+                      }}>
+                        <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Heart size={20} color="#ff6b6b" />
+                          Heart Rate Trends ({hrColumn})
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <AreaChart data={selectedPerson.healthData.slice(0, 30)}>
+                            <defs>
+                              <linearGradient id="colorHR" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#ff6b6b" stopOpacity={0.3}/>
+                                <stop offset="95%" stopColor="#ff6b6b" stopOpacity={0}/>
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                            <XAxis dataKey="id" stroke="#94a3b8" fontSize={12} />
+                            <YAxis stroke="#94a3b8" fontSize={12} />
+                            <Tooltip contentStyle={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
+                            <Area type="monotone" dataKey={hrColumn} stroke="#ff6b6b" strokeWidth={3} fillOpacity={1} fill="url(#colorHR)" />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    );
+                  })()}
 
-                  {/* Blood Pressure Chart */}
-                  {selectedPerson.healthData.some(d => d.BP_Systolic || d.SBP || d.Systolic || d['BP Systolic']) && (() => {
-                    const bpSysColumn = getColumnName(selectedPerson.healthData, ['BP_Systolic', 'SBP', 'Systolic', 'BP Systolic']);
-                    const bpDiaColumn = getColumnName(selectedPerson.healthData, ['BP_Diastolic', 'DBP', 'Diastolic', 'BP Diastolic']);
-                    return bpSysColumn && (
-                    <div style={{
-                      background: 'white',
-                      borderRadius: '16px',
-                      padding: '28px',
-                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.06)',
-                      border: '1px solid #e2e8f0'
-                    }}>
-                      <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Droplet size={20} color="#4ecdc4" />
-                        Blood Pressure
-                      </h3>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={selectedPerson.healthData.slice(0, 30)}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                          <XAxis dataKey="id" stroke="#94a3b8" fontSize={12} />
-                          <YAxis stroke="#94a3b8" fontSize={12} />
-                          <Tooltip contentStyle={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
-                          <Legend />
-                          <Line type="monotone" dataKey={bpSysColumn} stroke="#4ecdc4" strokeWidth={3} dot={false} name="Systolic" />
-                          {bpDiaColumn && <Line type="monotone" dataKey={bpDiaColumn} stroke="#44a08d" strokeWidth={3} dot={false} name="Diastolic" />}
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  );})()}
+                  {/* Blood Pressure Chart - Search for any BP-related columns */}
+                  {(() => {
+                    const columns = Object.keys(selectedPerson.healthData[0] || {});
+                    const bpSysColumn = columns.find(col => 
+                      col.toLowerCase().includes('systolic') || 
+                      col.toLowerCase().includes('sbp') ||
+                      col.toLowerCase().includes('bp_s')
+                    );
+                    const bpDiaColumn = columns.find(col => 
+                      col.toLowerCase().includes('diastolic') || 
+                      col.toLowerCase().includes('dbp') ||
+                      col.toLowerCase().includes('bp_d')
+                    );
+                    
+                    if (!bpSysColumn) return null;
+                    
+                    return (
+                      <div style={{
+                        background: 'white',
+                        borderRadius: '16px',
+                        padding: '28px',
+                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.06)',
+                        border: '1px solid #e2e8f0'
+                      }}>
+                        <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Droplet size={20} color="#4ecdc4" />
+                          Blood Pressure ({bpSysColumn}{bpDiaColumn ? `, ${bpDiaColumn}` : ''})
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={selectedPerson.healthData.slice(0, 30)}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                            <XAxis dataKey="id" stroke="#94a3b8" fontSize={12} />
+                            <YAxis stroke="#94a3b8" fontSize={12} />
+                            <Tooltip contentStyle={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
+                            <Legend />
+                            <Line type="monotone" dataKey={bpSysColumn} stroke="#4ecdc4" strokeWidth={3} dot={false} name="Systolic" />
+                            {bpDiaColumn && <Line type="monotone" dataKey={bpDiaColumn} stroke="#44a08d" strokeWidth={3} dot={false} name="Diastolic" />}
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    );
+                  })()}
 
-                  {/* SPO2 Chart */}
-                  {selectedPerson.healthData.some(d => d.SPO2 || d.spo2 || d['Oxygen Saturation'] || d.O2) && (() => {
-                    const spo2Column = getColumnName(selectedPerson.healthData, ['SPO2', 'spo2', 'Oxygen Saturation', 'O2']);
-                    return spo2Column && (
-                    <div style={{
-                      background: 'white',
-                      borderRadius: '16px',
-                      padding: '28px',
-                      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.06)',
-                      border: '1px solid #e2e8f0'
-                    }}>
-                      <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Wind size={20} color="#667eea" />
-                        Oxygen Saturation (SPO2)
-                      </h3>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={selectedPerson.healthData.slice(0, 30)}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                          <XAxis dataKey="id" stroke="#94a3b8" fontSize={12} />
-                          <YAxis stroke="#94a3b8" fontSize={12} domain={[90, 100]} />
-                          <Tooltip contentStyle={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
-                          <Bar dataKey={spo2Column} fill="#667eea" radius={[8, 8, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  );})()}
+                  {/* SPO2 Chart - Search for any oxygen-related column */}
+                  {(() => {
+                    const columns = Object.keys(selectedPerson.healthData[0] || {});
+                    const spo2Column = columns.find(col => 
+                      col.toLowerCase().includes('spo2') || 
+                      col.toLowerCase().includes('spo 2') ||
+                      col.toLowerCase().includes('oxygen') ||
+                      col.toLowerCase().includes('o2') ||
+                      col.toLowerCase().includes('sat')
+                    );
+                    
+                    if (!spo2Column) return null;
+                    
+                    return (
+                      <div style={{
+                        background: 'white',
+                        borderRadius: '16px',
+                        padding: '28px',
+                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.06)',
+                        border: '1px solid #e2e8f0'
+                      }}>
+                        <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#0f172a', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Wind size={20} color="#667eea" />
+                          Oxygen Saturation ({spo2Column})
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={selectedPerson.healthData.slice(0, 30)}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                            <XAxis dataKey="id" stroke="#94a3b8" fontSize={12} />
+                            <YAxis stroke="#94a3b8" fontSize={12} domain={[90, 100]} />
+                            <Tooltip contentStyle={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
+                            <Bar dataKey={spo2Column} fill="#667eea" radius={[8, 8, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}
