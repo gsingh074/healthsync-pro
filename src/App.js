@@ -12,6 +12,7 @@ export default function App() {
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('admin123');
   const [loginError, setLoginError] = useState('');
+  const [dataType, setDataType] = useState('all'); // 'all', 'hr', 'bp', 'spo2'
 
   // Get selected person object
   const selectedPerson = persons.find(p => p.id === selectedPersonId);
@@ -51,7 +52,7 @@ export default function App() {
     setActiveView('dashboard');
   };
 
-  // File Upload Handler - Links data to selected person
+  // File Upload Handler - Links data to selected person with merge capability
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -69,23 +70,65 @@ export default function App() {
       if (file.name.endsWith('.csv')) {
         const lines = text.split('\n');
         const headers = lines[0].split(',').map(h => h.trim());
-        const data = lines.slice(1).filter(line => line.trim()).map((line, index) => {
+        
+        const newData = lines.slice(1).filter(line => line.trim()).map((line, index) => {
           const values = line.split(',').map(v => v.trim());
-          const row = { id: index, uploadDate: new Date().toISOString() };
+          const row = { 
+            id: `${Date.now()}-${index}`,
+            uploadDate: new Date().toISOString(),
+            timestamp: values[0] || new Date().toISOString()
+          };
+          
           headers.forEach((header, i) => {
-            row[header] = isNaN(values[i]) ? values[i] : parseFloat(values[i]);
+            if (i > 0 || header.toLowerCase() !== 'timestamp') {
+              row[header] = isNaN(values[i]) ? values[i] : parseFloat(values[i]);
+            }
           });
+          
           return row;
         });
 
-        // Add data to the selected person
-        setPersons(persons.map(person => 
-          person.id === selectedPersonId 
-            ? { ...person, healthData: [...person.healthData, ...data] }
-            : person
-        ));
+        // Merge with existing data by timestamp
+        setPersons(persons.map(person => {
+          if (person.id !== selectedPersonId) return person;
+          
+          const mergedData = [...person.healthData];
+          
+          newData.forEach(newRecord => {
+            const existingIndex = mergedData.findIndex(
+              existing => existing.timestamp === newRecord.timestamp
+            );
+            
+            if (existingIndex >= 0) {
+              // Merge with existing record
+              mergedData[existingIndex] = {
+                ...mergedData[existingIndex],
+                ...newRecord
+              };
+            } else {
+              // Add as new record
+              mergedData.push(newRecord);
+            }
+          });
 
-        alert(`Successfully uploaded ${data.length} records for ${selectedPerson.name}!`);
+          // Sort by timestamp
+          mergedData.sort((a, b) => {
+            const dateA = new Date(a.timestamp);
+            const dateB = new Date(b.timestamp);
+            return dateA - dateB;
+          });
+
+          return { ...person, healthData: mergedData };
+        }));
+
+        const dataTypeLabel = dataType === 'all' ? 'health' : 
+                             dataType === 'hr' ? 'heart rate' :
+                             dataType === 'bp' ? 'blood pressure' : 'SPO2';
+        
+        alert(`✅ Successfully uploaded ${newData.length} ${dataTypeLabel} records for ${selectedPerson.name}!\n\nData has been merged with existing records.`);
+        
+        // Reset file input
+        e.target.value = '';
       }
     };
     reader.readAsText(file);
@@ -133,19 +176,29 @@ export default function App() {
     if (!selectedPerson || selectedPerson.healthData.length === 0) return null;
     
     const data = selectedPerson.healthData;
-    const hrData = data.filter(d => d.HR || d.hr || d['Heart Rate']).map(d => d.HR || d.hr || d['Heart Rate']);
-    const bpSystolicData = data.filter(d => d.BP_Systolic || d.SBP || d['BP Systolic']).map(d => d.BP_Systolic || d.SBP || d['BP Systolic']);
-    const spo2Data = data.filter(d => d.SPO2 || d.spo2 || d['Oxygen Saturation']).map(d => d.SPO2 || d.spo2 || d['Oxygen Saturation']);
+    const hrData = data.filter(d => d.HR || d.hr || d['Heart Rate'] || d.HeartRate).map(d => d.HR || d.hr || d['Heart Rate'] || d.HeartRate);
+    const bpSystolicData = data.filter(d => d.BP_Systolic || d.SBP || d['BP Systolic'] || d.Systolic).map(d => d.BP_Systolic || d.SBP || d['BP Systolic'] || d.Systolic);
+    const spo2Data = data.filter(d => d.SPO2 || d.spo2 || d['Oxygen Saturation'] || d.O2).map(d => d.SPO2 || d.spo2 || d['Oxygen Saturation'] || d.O2);
 
     return {
       avgHR: hrData.length ? (hrData.reduce((a, b) => a + b, 0) / hrData.length).toFixed(1) : 'N/A',
       avgBP: bpSystolicData.length ? (bpSystolicData.reduce((a, b) => a + b, 0) / bpSystolicData.length).toFixed(1) : 'N/A',
       avgSPO2: spo2Data.length ? (spo2Data.reduce((a, b) => a + b, 0) / spo2Data.length).toFixed(1) : 'N/A',
-      totalRecords: data.length
+      totalRecords: data.length,
+      hrCount: hrData.length,
+      bpCount: bpSystolicData.length,
+      spo2Count: spo2Data.length
     };
   };
 
   const stats = calculateStats();
+
+  // Helper function to get the actual column name for a vital
+  const getColumnName = (data, possibleNames) => {
+    if (!data || data.length === 0) return null;
+    const firstRow = data[0];
+    return possibleNames.find(name => firstRow.hasOwnProperty(name)) || null;
+  };
 
   if (!isLoggedIn) {
     return (
@@ -405,17 +458,19 @@ export default function App() {
               </option>
             ))}
           </select>
-          {selectedPerson && (
+          {selectedPerson && stats && (
             <div style={{
               marginLeft: 'auto',
               display: 'flex',
-              gap: '12px',
+              gap: '16px',
               fontSize: '13px',
               color: '#64748b'
             }}>
               <span><strong>Age:</strong> {selectedPerson.age}</span>
               <span><strong>Gender:</strong> {selectedPerson.gender}</span>
-              <span><strong>Records:</strong> {selectedPerson.healthData.length}</span>
+              <span style={{ color: stats.hrCount > 0 ? '#059669' : '#cbd5e1' }}>❤️ HR: {stats.hrCount}</span>
+              <span style={{ color: stats.bpCount > 0 ? '#059669' : '#cbd5e1' }}>🩸 BP: {stats.bpCount}</span>
+              <span style={{ color: stats.spo2Count > 0 ? '#059669' : '#cbd5e1' }}>🫁 SPO2: {stats.spo2Count}</span>
             </div>
           )}
         </div>
@@ -755,6 +810,56 @@ export default function App() {
               </div>
             )}
 
+            {/* Data Type Selector */}
+            {selectedPerson && (
+              <div style={{
+                background: 'white',
+                borderRadius: '12px',
+                padding: '20px',
+                marginBottom: '20px',
+                border: '1px solid #e2e8f0'
+              }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#0f172a', marginBottom: '12px' }}>
+                  📋 What type of data are you uploading?
+                </h3>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  {[
+                    { value: 'all', label: '📊 Complete Data', desc: '(All vitals in one file)' },
+                    { value: 'hr', label: '❤️ Heart Rate Only', desc: '' },
+                    { value: 'bp', label: '🩸 Blood Pressure Only', desc: '' },
+                    { value: 'spo2', label: '🫁 SPO2/Oxygen Only', desc: '' }
+                  ].map(type => (
+                    <button
+                      key={type.value}
+                      onClick={() => setDataType(type.value)}
+                      style={{
+                        padding: '12px 20px',
+                        border: `2px solid ${dataType === type.value ? '#0096c7' : '#e2e8f0'}`,
+                        borderRadius: '10px',
+                        background: dataType === type.value ? '#f0f9ff' : 'white',
+                        color: dataType === type.value ? '#0a4d5c' : '#64748b',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (dataType !== type.value) e.target.style.background = '#f8fafc';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (dataType !== type.value) e.target.style.background = 'white';
+                      }}
+                    >
+                      {type.label} {type.desc}
+                    </button>
+                  ))}
+                </div>
+                <p style={{ fontSize: '13px', color: '#64748b', marginTop: '12px', marginBottom: 0 }}>
+                  💡 Upload multiple files separately! Data will be automatically merged by timestamp.
+                </p>
+              </div>
+            )}
+
             <div style={{
               background: 'white',
               borderRadius: '16px',
@@ -773,10 +878,12 @@ export default function App() {
                 transition: 'all 0.3s ease'
               }}>
                 <Upload size={48} color="#0096c7" style={{ marginBottom: '16px' }} />
-                <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#0f172a', marginBottom: '8px' }}>Upload CSV File</h3>
+                <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#0f172a', marginBottom: '8px' }}>
+                  Upload {dataType === 'all' ? 'Complete' : dataType === 'hr' ? 'Heart Rate' : dataType === 'bp' ? 'Blood Pressure' : 'SPO2'} CSV File
+                </h3>
                 <p style={{ color: '#64748b', marginBottom: '24px', fontSize: '14px' }}>
                   {selectedPerson 
-                    ? `Upload health data for ${selectedPerson.name}`
+                    ? `Upload ${dataType === 'all' ? 'complete health' : dataType === 'hr' ? 'heart rate' : dataType === 'bp' ? 'blood pressure' : 'SPO2'} data for ${selectedPerson.name}`
                     : 'Select a patient first to upload their data'
                   }
                 </p>
@@ -801,36 +908,48 @@ export default function App() {
                 }}>
                   Choose File
                 </label>
-                <p style={{ color: '#94a3b8', fontSize: '12px', marginTop: '16px' }}>
-                  Expected columns: timestamp, HR, BP_Systolic, BP_Diastolic, SPO2
-                </p>
+                <div style={{
+                  background: '#f0f9ff',
+                  border: '1px solid #bae6fd',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  marginTop: '20px',
+                  textAlign: 'left'
+                }}>
+                  <p style={{ fontSize: '13px', fontWeight: '600', color: '#0369a1', margin: '0 0 8px 0' }}>
+                    📝 Expected Format:
+                  </p>
+                  <p style={{ fontSize: '12px', color: '#64748b', margin: 0, fontFamily: 'monospace' }}>
+                    {dataType === 'all' && 'timestamp, HR, BP_Systolic, BP_Diastolic, SPO2'}
+                    {dataType === 'hr' && 'timestamp, HR'}
+                    {dataType === 'bp' && 'timestamp, BP_Systolic, BP_Diastolic'}
+                    {dataType === 'spo2' && 'timestamp, SPO2'}
+                  </p>
+                </div>
               </div>
 
-              {selectedPerson && selectedPerson.healthData.length > 0 && (
+              {selectedPerson && selectedPerson.healthData.length > 0 && stats && (
                 <div style={{ marginTop: '24px' }}>
                   <div style={{
                     background: '#f0f9ff',
                     border: '1px solid #bae6fd',
                     borderRadius: '10px',
-                    padding: '16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px'
+                    padding: '16px'
                   }}>
-                    <div style={{
-                      width: '40px',
-                      height: '40px',
-                      background: '#0096c7',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <FileText size={20} color="white" />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                      <FileText size={20} color="#0096c7" />
+                      <p style={{ fontWeight: '600', color: '#0a4d5c', margin: 0 }}>{selectedPerson.name}'s Current Data:</p>
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontWeight: '600', color: '#0a4d5c', margin: 0 }}>{selectedPerson.name} has data!</p>
-                      <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>{selectedPerson.healthData.length} records loaded</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', fontSize: '13px' }}>
+                      <div style={{ color: stats.hrCount > 0 ? '#059669' : '#94a3b8' }}>
+                        ❤️ Heart Rate: <strong>{stats.hrCount} records</strong>
+                      </div>
+                      <div style={{ color: stats.bpCount > 0 ? '#059669' : '#94a3b8' }}>
+                        🩸 Blood Pressure: <strong>{stats.bpCount} records</strong>
+                      </div>
+                      <div style={{ color: stats.spo2Count > 0 ? '#059669' : '#94a3b8' }}>
+                        🫁 SPO2: <strong>{stats.spo2Count} records</strong>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -918,7 +1037,9 @@ export default function App() {
                 {/* Charts */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
                   {/* Heart Rate Chart */}
-                  {selectedPerson.healthData.some(d => d.HR || d.hr || d['Heart Rate']) && (
+                  {selectedPerson.healthData.some(d => d.HR || d.hr || d['Heart Rate'] || d.HeartRate) && (() => {
+                    const hrColumn = getColumnName(selectedPerson.healthData, ['HR', 'hr', 'Heart Rate', 'HeartRate']);
+                    return hrColumn && (
                     <div style={{
                       background: 'white',
                       borderRadius: '16px',
@@ -942,14 +1063,17 @@ export default function App() {
                           <XAxis dataKey="id" stroke="#94a3b8" fontSize={12} />
                           <YAxis stroke="#94a3b8" fontSize={12} />
                           <Tooltip contentStyle={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
-                          <Area type="monotone" dataKey="HR" stroke="#ff6b6b" strokeWidth={3} fillOpacity={1} fill="url(#colorHR)" />
+                          <Area type="monotone" dataKey={hrColumn} stroke="#ff6b6b" strokeWidth={3} fillOpacity={1} fill="url(#colorHR)" />
                         </AreaChart>
                       </ResponsiveContainer>
                     </div>
-                  )}
+                  );})()}
 
                   {/* Blood Pressure Chart */}
-                  {selectedPerson.healthData.some(d => d.BP_Systolic || d.SBP) && (
+                  {selectedPerson.healthData.some(d => d.BP_Systolic || d.SBP || d.Systolic || d['BP Systolic']) && (() => {
+                    const bpSysColumn = getColumnName(selectedPerson.healthData, ['BP_Systolic', 'SBP', 'Systolic', 'BP Systolic']);
+                    const bpDiaColumn = getColumnName(selectedPerson.healthData, ['BP_Diastolic', 'DBP', 'Diastolic', 'BP Diastolic']);
+                    return bpSysColumn && (
                     <div style={{
                       background: 'white',
                       borderRadius: '16px',
@@ -968,15 +1092,17 @@ export default function App() {
                           <YAxis stroke="#94a3b8" fontSize={12} />
                           <Tooltip contentStyle={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
                           <Legend />
-                          <Line type="monotone" dataKey="BP_Systolic" stroke="#4ecdc4" strokeWidth={3} dot={false} />
-                          <Line type="monotone" dataKey="BP_Diastolic" stroke="#44a08d" strokeWidth={3} dot={false} />
+                          <Line type="monotone" dataKey={bpSysColumn} stroke="#4ecdc4" strokeWidth={3} dot={false} name="Systolic" />
+                          {bpDiaColumn && <Line type="monotone" dataKey={bpDiaColumn} stroke="#44a08d" strokeWidth={3} dot={false} name="Diastolic" />}
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
-                  )}
+                  );})()}
 
                   {/* SPO2 Chart */}
-                  {selectedPerson.healthData.some(d => d.SPO2 || d.spo2) && (
+                  {selectedPerson.healthData.some(d => d.SPO2 || d.spo2 || d['Oxygen Saturation'] || d.O2) && (() => {
+                    const spo2Column = getColumnName(selectedPerson.healthData, ['SPO2', 'spo2', 'Oxygen Saturation', 'O2']);
+                    return spo2Column && (
                     <div style={{
                       background: 'white',
                       borderRadius: '16px',
@@ -994,11 +1120,11 @@ export default function App() {
                           <XAxis dataKey="id" stroke="#94a3b8" fontSize={12} />
                           <YAxis stroke="#94a3b8" fontSize={12} domain={[90, 100]} />
                           <Tooltip contentStyle={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
-                          <Bar dataKey="SPO2" fill="#667eea" radius={[8, 8, 0, 0]} />
+                          <Bar dataKey={spo2Column} fill="#667eea" radius={[8, 8, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
-                  )}
+                  );})()}
                 </div>
               </div>
             )}
