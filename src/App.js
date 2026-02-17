@@ -193,6 +193,43 @@ export default function App() {
 
   const stats = calculateStats();
 
+  // Helper function to format timestamps
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return '';
+    
+    // Check if it's a Unix timestamp (number)
+    if (typeof timestamp === 'number' || !isNaN(timestamp)) {
+      const date = new Date(parseFloat(timestamp));
+      if (isNaN(date.getTime())) return timestamp;
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+    }
+    
+    // Try to parse as date string
+    try {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return timestamp;
+      return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+    } catch {
+      return timestamp;
+    }
+  };
+
   if (!isLoggedIn) {
     return (
       <div style={{
@@ -1033,9 +1070,11 @@ export default function App() {
                           }}
                           onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
                           onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-                            {Object.values(row).map((val, j) => (
+                            {Object.entries(row).map(([key, val], j) => (
                               <td key={j} style={{ padding: '12px', color: '#475569', fontSize: '14px' }}>
-                                {typeof val === 'number' ? val.toFixed(2) : val}
+                                {key.toLowerCase().includes('timestamp') || key.toLowerCase().includes('time') || key.toLowerCase().includes('date') 
+                                  ? formatTimestamp(val)
+                                  : typeof val === 'number' ? val.toFixed(2) : val}
                               </td>
                             ))}
                           </tr>
@@ -1055,8 +1094,19 @@ export default function App() {
                       col.toLowerCase().includes('heart') ||
                       col.toLowerCase().includes('pulse')
                     );
+                    const timestampColumn = columns.find(col => 
+                      col.toLowerCase().includes('timestamp') || 
+                      col.toLowerCase().includes('time') ||
+                      col.toLowerCase().includes('date')
+                    );
                     
                     if (!hrColumn) return null;
+                    
+                    // Prepare data with formatted timestamps
+                    const chartData = selectedPerson.healthData.slice(0, 30).map(row => ({
+                      ...row,
+                      formattedTime: timestampColumn ? formatTimestamp(row[timestampColumn]).split(',')[1]?.trim() || formatTimestamp(row[timestampColumn]) : row.id
+                    }));
                     
                     return (
                       <div style={{
@@ -1071,7 +1121,7 @@ export default function App() {
                           Heart Rate Trends ({hrColumn})
                         </h3>
                         <ResponsiveContainer width="100%" height={300}>
-                          <AreaChart data={selectedPerson.healthData.slice(0, 30)}>
+                          <AreaChart data={chartData}>
                             <defs>
                               <linearGradient id="colorHR" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor="#ff6b6b" stopOpacity={0.3}/>
@@ -1079,9 +1129,19 @@ export default function App() {
                               </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                            <XAxis dataKey="id" stroke="#94a3b8" fontSize={12} />
+                            <XAxis 
+                              dataKey="formattedTime" 
+                              stroke="#94a3b8" 
+                              fontSize={11} 
+                              angle={-45}
+                              textAnchor="end"
+                              height={60}
+                            />
                             <YAxis stroke="#94a3b8" fontSize={12} />
-                            <Tooltip contentStyle={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
+                            <Tooltip 
+                              contentStyle={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                              labelFormatter={(value) => `Time: ${value}`}
+                            />
                             <Area type="monotone" dataKey={hrColumn} stroke="#ff6b6b" strokeWidth={3} fillOpacity={1} fill="url(#colorHR)" />
                           </AreaChart>
                         </ResponsiveContainer>
@@ -1102,8 +1162,19 @@ export default function App() {
                       col.toLowerCase().includes('dbp') ||
                       col.toLowerCase().includes('bp_d')
                     );
+                    const timestampColumn = columns.find(col => 
+                      col.toLowerCase().includes('timestamp') || 
+                      col.toLowerCase().includes('time') ||
+                      col.toLowerCase().includes('date')
+                    );
                     
                     if (!bpSysColumn) return null;
+                    
+                    // Prepare data with formatted timestamps
+                    const chartData = selectedPerson.healthData.slice(0, 30).map(row => ({
+                      ...row,
+                      formattedTime: timestampColumn ? formatTimestamp(row[timestampColumn]).split(',')[1]?.trim() || formatTimestamp(row[timestampColumn]) : row.id
+                    }));
                     
                     return (
                       <div style={{
@@ -1118,11 +1189,21 @@ export default function App() {
                           Blood Pressure ({bpSysColumn}{bpDiaColumn ? `, ${bpDiaColumn}` : ''})
                         </h3>
                         <ResponsiveContainer width="100%" height={300}>
-                          <LineChart data={selectedPerson.healthData.slice(0, 30)}>
+                          <LineChart data={chartData}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                            <XAxis dataKey="id" stroke="#94a3b8" fontSize={12} />
+                            <XAxis 
+                              dataKey="formattedTime" 
+                              stroke="#94a3b8" 
+                              fontSize={11}
+                              angle={-45}
+                              textAnchor="end"
+                              height={60}
+                            />
                             <YAxis stroke="#94a3b8" fontSize={12} />
-                            <Tooltip contentStyle={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
+                            <Tooltip 
+                              contentStyle={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                              labelFormatter={(value) => `Time: ${value}`}
+                            />
                             <Legend />
                             <Line type="monotone" dataKey={bpSysColumn} stroke="#4ecdc4" strokeWidth={3} dot={false} name="Systolic" />
                             {bpDiaColumn && <Line type="monotone" dataKey={bpDiaColumn} stroke="#44a08d" strokeWidth={3} dot={false} name="Diastolic" />}
@@ -1142,8 +1223,19 @@ export default function App() {
                       col.toLowerCase().includes('o2') ||
                       col.toLowerCase().includes('sat')
                     );
+                    const timestampColumn = columns.find(col => 
+                      col.toLowerCase().includes('timestamp') || 
+                      col.toLowerCase().includes('time') ||
+                      col.toLowerCase().includes('date')
+                    );
                     
                     if (!spo2Column) return null;
+                    
+                    // Prepare data with formatted timestamps
+                    const chartData = selectedPerson.healthData.slice(0, 30).map(row => ({
+                      ...row,
+                      formattedTime: timestampColumn ? formatTimestamp(row[timestampColumn]).split(',')[1]?.trim() || formatTimestamp(row[timestampColumn]) : row.id
+                    }));
                     
                     return (
                       <div style={{
@@ -1158,11 +1250,21 @@ export default function App() {
                           Oxygen Saturation ({spo2Column})
                         </h3>
                         <ResponsiveContainer width="100%" height={300}>
-                          <BarChart data={selectedPerson.healthData.slice(0, 30)}>
+                          <BarChart data={chartData}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                            <XAxis dataKey="id" stroke="#94a3b8" fontSize={12} />
+                            <XAxis 
+                              dataKey="formattedTime" 
+                              stroke="#94a3b8" 
+                              fontSize={11}
+                              angle={-45}
+                              textAnchor="end"
+                              height={60}
+                            />
                             <YAxis stroke="#94a3b8" fontSize={12} domain={[90, 100]} />
-                            <Tooltip contentStyle={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
+                            <Tooltip 
+                              contentStyle={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                              labelFormatter={(value) => `Time: ${value}`}
+                            />
                             <Bar dataKey={spo2Column} fill="#667eea" radius={[8, 8, 0, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
