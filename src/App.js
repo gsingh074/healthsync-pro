@@ -230,6 +230,32 @@ export default function App() {
     }
   };
 
+  // Helper function for chart labels - shows time with milliseconds if needed
+  const formatChartTime = (timestamp) => {
+    if (!timestamp) return '';
+    
+    try {
+      let date;
+      if (typeof timestamp === 'number' || !isNaN(timestamp)) {
+        date = new Date(parseFloat(timestamp));
+      } else {
+        date = new Date(timestamp);
+      }
+      
+      if (isNaN(date.getTime())) return timestamp;
+      
+      // Show time with milliseconds for precision
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+      const ms = String(date.getMilliseconds()).padStart(3, '0');
+      
+      return `${hours}:${minutes}:${seconds}.${ms}`;
+    } catch {
+      return timestamp;
+    }
+  };
+
   if (!isLoggedIn) {
     return (
       <div style={{
@@ -1042,7 +1068,7 @@ export default function App() {
                   border: '1px solid #e2e8f0'
                 }}>
                   <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#0f172a', marginBottom: '20px' }}>
-                    {selectedPerson.name}'s Health Data
+                    {selectedPerson.name}'s Health Data ({selectedPerson.healthData.length} total records)
                   </h3>
                   <div style={{ overflowX: 'auto', maxHeight: '400px', overflowY: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -1063,7 +1089,7 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody>
-                        {selectedPerson.healthData.slice(0, 50).map((row, i) => (
+                        {selectedPerson.healthData.map((row, i) => (
                           <tr key={i} style={{
                             borderBottom: '1px solid #f1f5f9',
                             transition: 'background 0.2s ease'
@@ -1105,7 +1131,7 @@ export default function App() {
                     // Prepare data with formatted timestamps
                     const chartData = selectedPerson.healthData.slice(0, 30).map(row => ({
                       ...row,
-                      formattedTime: timestampColumn ? formatTimestamp(row[timestampColumn]).split(',')[1]?.trim() || formatTimestamp(row[timestampColumn]) : row.id
+                      formattedTime: timestampColumn ? formatChartTime(row[timestampColumn]) : row.id
                     }));
                     
                     return (
@@ -1132,10 +1158,11 @@ export default function App() {
                             <XAxis 
                               dataKey="formattedTime" 
                               stroke="#94a3b8" 
-                              fontSize={11} 
-                              angle={-45}
+                              fontSize={9} 
+                              angle={-65}
                               textAnchor="end"
-                              height={60}
+                              height={80}
+                              interval="preserveStartEnd"
                             />
                             <YAxis stroke="#94a3b8" fontSize={12} />
                             <Tooltip 
@@ -1173,7 +1200,7 @@ export default function App() {
                     // Prepare data with formatted timestamps
                     const chartData = selectedPerson.healthData.slice(0, 30).map(row => ({
                       ...row,
-                      formattedTime: timestampColumn ? formatTimestamp(row[timestampColumn]).split(',')[1]?.trim() || formatTimestamp(row[timestampColumn]) : row.id
+                      formattedTime: timestampColumn ? formatChartTime(row[timestampColumn]) : row.id
                     }));
                     
                     return (
@@ -1194,10 +1221,11 @@ export default function App() {
                             <XAxis 
                               dataKey="formattedTime" 
                               stroke="#94a3b8" 
-                              fontSize={11}
-                              angle={-45}
+                              fontSize={9}
+                              angle={-65}
                               textAnchor="end"
-                              height={60}
+                              height={80}
+                              interval="preserveStartEnd"
                             />
                             <YAxis stroke="#94a3b8" fontSize={12} />
                             <Tooltip 
@@ -1234,7 +1262,7 @@ export default function App() {
                     // Prepare data with formatted timestamps
                     const chartData = selectedPerson.healthData.slice(0, 30).map(row => ({
                       ...row,
-                      formattedTime: timestampColumn ? formatTimestamp(row[timestampColumn]).split(',')[1]?.trim() || formatTimestamp(row[timestampColumn]) : row.id
+                      formattedTime: timestampColumn ? formatChartTime(row[timestampColumn]) : row.id
                     }));
                     
                     return (
@@ -1255,10 +1283,11 @@ export default function App() {
                             <XAxis 
                               dataKey="formattedTime" 
                               stroke="#94a3b8" 
-                              fontSize={11}
-                              angle={-45}
+                              fontSize={9}
+                              angle={-65}
                               textAnchor="end"
-                              height={60}
+                              height={80}
+                              interval="preserveStartEnd"
                             />
                             <YAxis stroke="#94a3b8" fontSize={12} domain={[90, 100]} />
                             <Tooltip 
